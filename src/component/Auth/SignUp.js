@@ -1,4 +1,5 @@
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { api } from '../../utils/api';
 import axios from 'axios';
 import { useState } from 'react';
 import { Alert, Box, Button, InputAdornment, Link, Paper, TextField, Typography } from '@mui/material';
@@ -26,7 +27,7 @@ export default function SignUp() {
         else {
             setIsSubmitting(true);
             try {
-                await axios.post("http://localhost:3005/api/v1/user/signup", form, {
+                await api.post('/api/v1/user/signup', form, {
                     headers: {'Content-Type': 'application/json'}
                 });
                 navigate('/')
