@@ -1,6 +1,5 @@
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { api } from '../../utils/api';
-import axios from 'axios';
 import { useState } from 'react';
 import { Alert, Box, Button, InputAdornment, Link, Paper, TextField, Typography } from '@mui/material';
 
