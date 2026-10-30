@@ -17,7 +17,7 @@ beforeEach(() => { jest.resetAllMocks(); localStorage.setItem('token', 'test-tok
 
 test('loads all folders, including long names, and opens the selected detail', async () => {
   const long = { id: 'long', name: 'Advanced interdisciplinary studies '.repeat(3) };
-  api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/folders') ? { folders: [], breadcrumbs: [] } : url === '/api/v1/courses' ? [biology, long] : biology }));
+  api.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/materials') ? { materials: [], usage: { usedBytes: 0, maxFileBytes: 20000000, limitBytes: 500000000 } } : url.endsWith('/folders') ? { folders: [], breadcrumbs: [] } : url === '/api/v1/courses' ? [biology, long] : biology }));
   render(<View />);
   expect(screen.getByRole('progressbar', { name: 'Loading courses' })).toBeInTheDocument();
   expect(await screen.findByRole('link', { name: `Open ${long.name.trim()}` })).toHaveAttribute('href', '/p_chung/courses/long');

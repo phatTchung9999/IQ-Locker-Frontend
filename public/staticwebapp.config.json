@@ -1,0 +1,15 @@
+{
+  "mimeTypes": {
+    ".mjs": "text/javascript",
+    ".wasm": "application/wasm"
+  },
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": [
+      "/static/*",
+      "/pdfjs/*",
+      "/favicon.ico",
+      "/manifest.json"
+    ]
+  }
+}

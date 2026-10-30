@@ -5,8 +5,35 @@ import { api } from '../../utils/api';
 import { FolderIcon } from './CourseCard';
 import { courseOptions, isCourse } from './courseData';
 import { courseError } from './CourseDialogs';
+import CourseMaterials from '../Materials/CourseMaterials';
 import CourseHeader from './CourseHeader';
 import FolderDialog from './FolderDialogs';
+
+function FolderDropTarget({ folder, children, courseId, onUnauthorized }) {
+  const [dragging, setDragging] = useState(false);
+  const [files, setFiles] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const depth = useRef(0);
+  const hasFiles = (event) => Array.from(event.dataTransfer.types || []).includes('Files');
+  return <ListItem disablePadding onDragEnter={(event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault(); depth.current += 1; setDragging(true);
+  }} onDragOver={(event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault(); event.dataTransfer.dropEffect = uploading ? 'none' : 'copy';
+  }} onDragLeave={() => {
+    depth.current = Math.max(0, depth.current - 1);
+    if (!depth.current) setDragging(false);
+  }} onDrop={(event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault(); event.stopPropagation(); depth.current = 0; setDragging(false);
+    if (!uploading && event.dataTransfer.files.length) setFiles(Array.from(event.dataTransfer.files));
+  }} sx={{ display: 'block', borderBottom: '1px solid #eef0f3', '&:last-child': { border: 0 }, bgcolor: dragging ? '#edf3f9' : 'transparent', outline: dragging ? '2px solid #56799e' : 'none', outlineOffset: '-2px', transition: 'background-color 120ms ease' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center' }}>{children}</Box>
+    {dragging && <Typography sx={{ px: 2, pb: 1.5, fontSize: 12, fontWeight: 600, color: '#40566e', pointerEvents: 'none' }}>{uploading ? 'Upload in progress in' : 'Drop to upload into'} {folder.name}</Typography>}
+    {files && <CourseMaterials courseId={courseId} folderId={folder.id} hasFolders uploadOnly incomingFiles={files} onUploadingChange={setUploading} onUnauthorized={onUnauthorized} />}
+  </ListItem>;
+}
 
 export default function CourseFolders({ course, folderId, basePath, onUnauthorized, courseActions }) {
   const [data, setData] = useState(null);
@@ -65,7 +92,7 @@ export default function CourseFolders({ course, folderId, basePath, onUnauthoriz
   </IconButton>;
   return <>
     <CourseHeader course={course} folderId={folderId} breadcrumbs={data?.breadcrumbs ?? []} basePath={basePath} actions={courseActions} />
-    <Box sx={{ p: { xs: 2, sm: 3 }, borderTop: '1px solid #e9edf1' }}>
+    <Box onDragOver={(event) => { if (Array.from(event.dataTransfer.types || []).includes('Files')) event.preventDefault(); }} onDrop={(event) => { if (Array.from(event.dataTransfer.types || []).includes('Files')) event.preventDefault(); }} sx={{ p: { xs: 2, sm: 3 }, borderTop: '1px solid #e9edf1' }}>
     {loading ? <Box sx={{ textAlign: 'center', py: 5 }}><CircularProgress size={26} aria-label="Loading folders" /></Box> : error ? <><Alert severity="error">{error}</Alert><Button onClick={() => setReload((n) => n + 1)}>Try again</Button></> : <>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 2 }}>
         {current && <Box sx={{ minWidth: 0, flex: 1, flexBasis: { xs: '100%', sm: 'auto' } }}><Typography component="h2" sx={{ fontSize: 20, fontWeight: 600, overflowWrap: 'anywhere' }}>{current.name}</Typography></Box>}
@@ -73,12 +100,13 @@ export default function CourseFolders({ course, folderId, basePath, onUnauthoriz
         <Button disabled={busy || data.breadcrumbs.length >= 10} onClick={() => setDialog({ kind: 'create' })} sx={{ textTransform: 'none', color: '#40566e' }}>+ Create folder</Button>
       </Box>
       {data.breadcrumbs.length >= 10 && <Alert severity="info" sx={{ mb: 2 }}>You’ve reached the 10-level nesting limit.</Alert>}
-      {!data.folders.length ? <Box sx={{ textAlign: 'center', py: 5 }}><FolderIcon /><Typography sx={{ fontSize: 15, fontWeight: 600, color: '#657487', mt: 2 }}>{folderId ? 'This folder is empty' : 'This course folder is empty'}</Typography><Typography sx={{ fontSize: 12, color: '#8b96a4', mt: 1 }}>Create a folder to organize your course materials.</Typography></Box> : <Paper variant="outlined" sx={{ borderRadius: '10px', overflow: 'hidden' }}><List disablePadding aria-label="Course folders">
-        {data.folders.map((folder) => <ListItem key={folder.id} disablePadding sx={{ borderBottom: '1px solid #eef0f3', '&:last-child': { border: 0 } }}>
+      {data.folders.length > 0 && <Paper variant="outlined" sx={{ borderRadius: '10px', overflow: 'hidden' }}><List disablePadding aria-label="Course folders">
+        {data.folders.map((folder) => <FolderDropTarget key={folder.id} folder={folder} courseId={course.id} onUnauthorized={onUnauthorized}>
           <ListItemButton component={RouterLink} to={folderPath(folder.id)} aria-label={`Open folder ${folder.name}`} sx={{ gap: 2, p: 2, minWidth: 0 }}><Box sx={{ flexShrink: 0, display: 'flex' }}><FolderIcon /></Box><Box sx={{ minWidth: 0 }}><Typography sx={{ fontSize: 14, fontWeight: 600, overflowWrap: 'anywhere' }}>{folder.name}</Typography></Box></ListItemButton>
           {!folder.isStarter && action(folder, 'edit', 'Edit folder')}{!folder.isStarter && action(folder, 'delete', 'Delete folder')}
-        </ListItem>)}
+        </FolderDropTarget>)}
       </List></Paper>}
+      <CourseMaterials key={`${course.id}:${folderId || 'root'}`} courseId={course.id} folderId={folderId} hideUploadArea={!folderId || data.folders.length > 0} hasFolders={data.folders.length > 0} onUnauthorized={onUnauthorized} />
     </>}
     {dialog && <FolderDialog folder={dialog.folder} deleting={dialog.kind === 'delete'} onClose={() => setDialog(null)} onSubmit={(fields) => change(dialog.kind, fields)} />}
     </Box>

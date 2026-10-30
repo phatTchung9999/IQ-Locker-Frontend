@@ -4,6 +4,9 @@ import { createTheme, ThemeProvider } from '@mui/material/styles';
 import CourseFolders from './CourseFolders';
 import { api } from '../../utils/api';
 jest.mock('react-router-dom', () => jest.requireActual('react-router'));
+jest.mock('../Materials/CourseMaterials', () => function MaterialsPlaceholder({ hasFolders, folderId }) {
+  return hasFolders ? null : <div>{folderId ? 'This folder is empty' : 'This course folder is empty'}</div>;
+});
 jest.mock('../../utils/api', () => ({ api: { get: jest.fn(), post: jest.fn(), patch: jest.fn(), delete: jest.fn() } }));
 const course = { id: 'course1', name: 'Biology' };
 const root = { id: 'lectures', name: 'Lectures', parent: null, materialType: 'lecture' };
