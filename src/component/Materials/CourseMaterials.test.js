@@ -152,3 +152,16 @@ test('populated folder reveals a drop overlay only for file drags and keeps prog
   expect(await screen.findByText('Document uploaded.')).toBeInTheDocument();
   expect(screen.queryByText('Drop your material here')).not.toBeInTheDocument();
 });
+
+test('focuses the document linked from a notification after its folder loads', async () => {
+  const id = '0123456789abcdef01234567';
+  const previous = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  window.history.replaceState({}, '', `#material-${id}`);
+  api.get.mockResolvedValue(response([{ ...material, id }]));
+  try {
+    open();
+    const preview = await screen.findByRole('button', { name: 'Preview Week 1 Notes' });
+    await waitFor(() => expect(preview).toHaveFocus());
+    expect(preview.closest('li')).toHaveAttribute('id', `material-${id}`);
+  } finally { window.history.replaceState({}, '', previous); }
+});

@@ -62,13 +62,11 @@ export default function SignIn({ onSignIn }) {
         bgcolor: '#e7e8ea', backgroundImage: 'radial-gradient(ellipse at 50% 45%, #f4f4f5 0%, #e1e3e6 75%)',
         px: { xs: 3, md: 6 }, pt: { xs: 3, md: 4 }, pb: 3,
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-          <Box aria-hidden="true" sx={{ width: 31, height: 35, border: '2px solid #414954', borderRadius: '5px', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 11 }}>IQ</Box>
-          <Typography sx={{ fontWeight: 800, letterSpacing: '-.7px', fontSize: 21 }}>IQLocker</Typography>
-        </Box>
         <Box sx={{ textAlign: 'center', my: 'auto', pt: { xs: 3, md: 5 }, pb: 2 }}>
-          <Typography sx={{ fontSize: 10, letterSpacing: '2.5px', fontWeight: 700, color: '#66707b' }}>MAKE ROOM FOR WHAT’S NEXT</Typography>
-          <Typography id="locker-title" component="h1" sx={{ fontWeight: 700, fontSize: { xs: 30, md: 38 }, lineHeight: 1.2, letterSpacing: '-1.4px', mt: 1.5 }}>Big ideas. One locker.</Typography>
+          <Box id="locker-title" component="h1" aria-label="IQLocker" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75, m: 0 }}>
+            <Box component="span" aria-hidden="true" sx={{ width: { xs: 38, md: 44 }, height: { xs: 42, md: 48 }, border: '3px solid #26394e', borderRadius: '7px', display: 'grid', placeItems: 'center', color: '#26394e', fontWeight: 800, fontSize: { xs: 16, md: 19 }, lineHeight: 1, flexShrink: 0 }}>IQ</Box>
+            <Typography component="span" aria-hidden="true" sx={{ fontWeight: 800, fontSize: { xs: 30, md: 38 }, lineHeight: 1.2, letterSpacing: '-1.4px', color: '#26394e' }}>Locker</Typography>
+          </Box>
           <Typography sx={{ color: '#68717c', fontSize: 13, mt: 1.5 }}>Store Smart. Analyze Smarter.</Typography>
 
           <Box aria-hidden="true" sx={{
@@ -134,15 +132,12 @@ export default function SignIn({ onSignIn }) {
               </Box>
             </Box>
           </Box>
-          <Typography sx={{ fontSize: 12, lineHeight: 1.8, color: '#68717c', maxWidth: 285, mx: 'auto', mt: 4 }}>Your notes, your courses, your potential.<br />Keep it all together.</Typography>
         </Box>
-        <Typography sx={{ color: '#727b86', fontSize: 10, mt: 3 }}>A little organization. A lot of possibility.</Typography>
       </Box>
 
       <Box component="section" aria-labelledby="login-title" sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', px: { xs: 3, md: 5 }, py: { xs: 6, md: 8 }, position: 'relative' }}>
         <Paper elevation={0} sx={{ width: '100%', maxWidth: 400, bgcolor: 'transparent' }}>
-          <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#78828e', letterSpacing: 2 }}>YOUR SPACE TO GROW</Typography>
-          <Typography component="h2" id="login-title" sx={{ fontSize: { xs: 32, md: 38 }, fontWeight: 700, letterSpacing: '-1.3px', mt: 1.5 }}>Welcome back.</Typography>
+          <Typography component="h2" id="login-title" sx={{ fontSize: { xs: 32, md: 38 }, fontWeight: 700, letterSpacing: '-1.3px' }}>Welcome back.</Typography>
           <Typography sx={{ color: '#78818c', fontSize: 14, mt: 1, mb: 4 }}>Sign in and open up to what’s next.</Typography>
           <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5,
             '& .MuiOutlinedInput-root': { bgcolor: '#fff', borderRadius: '8px', fontSize: 14, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#496788' } },
@@ -161,7 +156,6 @@ export default function SignIn({ onSignIn }) {
           </Box>
           <Typography sx={{ textAlign: 'center', fontSize: 13, color: '#7c8490', mt: 3.5 }}>New to IQLocker?{' '}<Link component={RouterLink} to="/signup" sx={{ color: '#34475c', fontWeight: 600, textUnderlineOffset: '4px' }}>Create an account</Link></Typography>
         </Paper>
-        <Typography sx={{ fontSize: 10, color: '#8b939c', mt: 7, position: { md: 'absolute' }, bottom: 27 }}>IQLocker · Store Smart. Analyze Smarter.</Typography>
       </Box>
     </Box>
   );

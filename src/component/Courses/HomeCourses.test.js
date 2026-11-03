@@ -1,3 +1,5 @@
+// Notifications have their own polling/API tests; keep these course requests isolated.
+jest.mock('../Navbar/Notifications', () => () => null);
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createTheme, ThemeProvider } from '@mui/material/styles';

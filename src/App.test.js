@@ -341,3 +341,25 @@ test('preserves a direct nested-folder path when correcting the account handle',
   expect(window.location.pathname).toBe(`/p_chung/courses/${courseId}/folders/${folderId}`);
   expect(screen.getByRole('link', { name: 'Courses', exact: true, current: 'page' })).toBeInTheDocument();
 });
+
+test('places notifications above account in the sidebar and removes requested slogans', async () => {
+  await openHome();
+  const bell = screen.getByRole('button', { name: 'Notifications', exact: true });
+  const account = screen.getByRole('button', { name: 'Account menu' });
+  expect(bell.closest('nav')).toBe(account.closest('nav'));
+  expect(bell.compareDocumentPosition(account) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.queryByText('Store Smart. Analyze Smarter.')).not.toBeInTheDocument();
+  expect(screen.queryByText('A clearer space for everything you’re learning.')).not.toBeInTheDocument();
+  expect(screen.queryByText('IQLocker · A little organization. A lot of possibility.')).not.toBeInTheDocument();
+});
+
+test('keeps notifications above account in the mobile navigation drawer', async () => {
+  window.matchMedia = jest.fn().mockImplementation(query => ({ matches: false, media: query,
+    addListener: jest.fn(), removeListener: jest.fn(), addEventListener: jest.fn(), removeEventListener: jest.fn() }));
+  await openHome();
+  fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
+  const bell = await screen.findByRole('button', { name: 'Notifications', exact: true });
+  const account = screen.getByRole('button', { name: 'Account menu' });
+  expect(bell.closest('nav')).toBe(account.closest('nav'));
+  expect(bell.compareDocumentPosition(account) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});

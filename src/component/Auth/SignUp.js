@@ -55,7 +55,10 @@ export default function SignUp() {
                 border: '1px solid #dfe3e7', borderRadius: '16px',
                 boxShadow: '0 12px 40px #26394e08',
             }}>
-                <Typography sx={{ fontWeight: 800, letterSpacing: '-.7px', fontSize: 21, textAlign: 'center' }}>IQLocker</Typography>
+                <Box role="img" aria-label="IQLocker" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.6 }}>
+                    <Box component="span" aria-hidden="true" sx={{ width: { xs: 30, md: 35 }, height: { xs: 34, md: 38 }, border: '2.5px solid #26394e', borderRadius: '6px', display: 'grid', placeItems: 'center', color: '#26394e', fontWeight: 800, fontSize: { xs: 13, md: 15 }, lineHeight: 1, flexShrink: 0 }}>IQ</Box>
+                    <Typography component="span" aria-hidden="true" sx={{ fontWeight: 800, fontSize: { xs: 24, md: 30 }, lineHeight: 1.2, letterSpacing: '-1.1px', color: '#26394e' }}>Locker</Typography>
+                </Box>
                 <Typography component="h1" id="signup-title" sx={{ fontSize: 28, fontWeight: 700, letterSpacing: '-.8px', mt: 3, mb: 3.5, textAlign: 'center' }}>Create your own space</Typography>
                 <Box component="form" onSubmit={handleSubmit} aria-busy={isSubmitting} sx={{
                     display: 'flex', flexDirection: 'column', gap: 2.5,

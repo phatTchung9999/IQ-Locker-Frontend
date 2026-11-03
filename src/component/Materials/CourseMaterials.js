@@ -5,13 +5,21 @@ import { courseOptions } from '../Courses/courseData';
 import { courseError } from '../Courses/CourseDialogs';
 import { FolderIcon } from '../Courses/CourseCard';
 import MaterialDialog from './MaterialDialog';
+import ExtractionStatus from './ExtractionStatus';
 const PdfPreview = lazy(() => import('./PdfPreview'));
 const size = (bytes) => bytes < 1000 ? `${bytes} B` : bytes < 1_000_000 ? `${(bytes / 1000).toFixed(1)} KB` : `${(bytes / 1_000_000).toFixed(1)} MB`;
 const valid = (item) => typeof item?.id === 'string' && typeof item.title === 'string' && ['application/pdf', 'text/plain'].includes(item.mediaType);
+const extractionActive = (item) => item.state === 'ready' && ['not_started', 'queued', 'processing'].includes(item.processingStatus);
+function checkList(data) {
+  if (!Array.isArray(data?.materials) || !data.materials.every(valid) || !data.usage || ![data.usage.usedBytes, data.usage.limitBytes, data.usage.maxFileBytes].every(Number.isFinite)) throw new Error('Invalid document response');
+}
 const fallbackLimits = { maxFileBytes: 20_000_000, limitBytes: 500_000_000, usedBytes: 0 };
 
 export default function CourseMaterials({ courseId, folderId, hasFolders, onUnauthorized, hideUploadArea = false, uploadOnly = false, incomingFiles, onUploadingChange }) {
   const [items, setItems] = useState([]);
+  const [processingEnabled, setProcessingEnabled] = useState(null);
+  const [pollError, setPollError] = useState('');
+  const [retrying, setRetrying] = useState(null);
   const [usage, setUsage] = useState(fallbackLimits);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,17 +46,75 @@ export default function CourseMaterials({ courseId, folderId, hasFolders, onUnau
   }, []);
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true); setLoadError('');
+    setLoading(true); setLoadError(''); setPollError('');
     api.get(endpoint, { ...courseOptions(controller.signal), ...(folderId ? { params: { folder: folderId } } : {}) }).then(({ data }) => {
       if (controller.signal.aborted) return;
-      if (!Array.isArray(data?.materials) || !data.materials.every(valid) || !data.usage || ![data.usage.usedBytes, data.usage.limitBytes, data.usage.maxFileBytes].every(Number.isFinite)) throw new Error('Invalid document response');
-      setItems(data.materials); setUsage(data.usage);
+      checkList(data);
+      setItems(data.materials); setUsage(data.usage); setProcessingEnabled(typeof data.processingEnabled === 'boolean' ? data.processingEnabled : null);
     }).catch((err) => { if (!controller.signal.aborted) { authorize(err); setLoadError(courseError(err, 'We couldn’t load your documents. Please try again.')); } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
     // The component is keyed by course/folder in its parent; callbacks stay in a ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint, folderId, reload]);
+
+  const targetHash = window.location.hash;
+  const focusedTarget = useRef('');
+  useEffect(() => {
+    if (loading || uploadOnly || focusedTarget.current === targetHash || !/^#material-[a-f\d]{24}$/i.test(targetHash)) return;
+    const row = document.getElementById(targetHash.slice(1));
+    if (row) {
+      row.scrollIntoView?.({ block: 'center' });
+      row.querySelector('[role="button"], button')?.focus();
+      focusedTarget.current = targetHash;
+    }
+  }, [loading, items, targetHash, uploadOnly]);
+
+  const hasActiveExtraction = items.some(extractionActive);
+  useEffect(() => {
+    if (uploadOnly || loading || loadError || processingEnabled !== true || !hasActiveExtraction) return;
+    let active = true, timer, controller;
+    const schedule = () => {
+      clearTimeout(timer);
+      if (active && !document.hidden) timer = setTimeout(poll, 5000);
+    };
+    const poll = async () => {
+      if (!active || document.hidden) return;
+      controller = new AbortController();
+      const request = controller;
+      try {
+        const { data } = await api.get(endpoint, { ...courseOptions(request.signal), ...(folderId ? { params: { folder: folderId } } : {}) });
+        if (!active || request.signal.aborted) return;
+        checkList(data);
+        setItems(data.materials); setUsage(data.usage); setProcessingEnabled(data.processingEnabled === true); setPollError('');
+        if (data.processingEnabled === true && data.materials.some(extractionActive)) schedule();
+      } catch (err) {
+        if (!active || request.signal.aborted) return;
+        if (err.response?.status === 401) unauthorized.current();
+        else setPollError('We couldn’t refresh text processing. Your documents are still available.');
+        // Stop automatic retries after an error; explicit refresh starts again.
+      }
+    };
+    const visibility = () => { clearTimeout(timer); if (document.hidden) controller?.abort(); else schedule(); };
+    document.addEventListener('visibilitychange', visibility); schedule();
+    return () => { active = false; clearTimeout(timer); controller?.abort(); document.removeEventListener('visibilitychange', visibility); };
+  }, [endpoint, folderId, hasActiveExtraction, processingEnabled, uploadOnly, loading, loadError, reload]);
+  const retryExtraction = async (material) => {
+    if (mutation.current) return;
+    const controller = new AbortController(); mutation.current = controller; setRetrying(material.id); setError(''); setNotice('');
+    try {
+      const { data } = await api.post(`${endpoint}/${encodeURIComponent(material.id)}/extraction/retry`, {}, courseOptions(controller.signal));
+      if (!alive.current || controller.signal.aborted) return;
+      if (!valid(data) || data.id !== material.id) throw new Error('Invalid document response');
+      setItems(current => current.map(item => item.id === data.id ? data : item));
+      setPollError(''); setNotice('Text extraction queued.'); setReload(value => value + 1);
+    } catch (err) {
+      if (alive.current && !controller.signal.aborted) { authorize(err); setError(courseError(err, 'We couldn’t retry text extraction. Please try again.')); setReload(value => value + 1); }
+    } finally {
+      if (mutation.current === controller) mutation.current = null;
+      if (alive.current) setRetrying(null);
+    }
+  };
 
   const send = async (files) => {
     if (upload.current || !files?.length) return;
@@ -148,15 +214,20 @@ export default function CourseMaterials({ courseId, folderId, hasFolders, onUnau
     {uploading && <Box sx={{ my: 2, px: uploadOnly ? 2 : 0 }}><LinearProgress variant="determinate" value={progress} aria-label="Upload progress" /><Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}><Typography role="status" sx={{ fontSize: 12 }}>{progress < 100 ? `Uploading ${progress}%` : 'Saving privately…'}</Typography><Button size="small" onClick={() => upload.current?.abort()}>Cancel upload</Button></Box></Box>}
     {notice && <Alert severity="success" role="status" sx={{ mb: 2 }} onClose={() => setNotice('')}>{notice}</Alert>}
     {loadError && <Alert severity="error" sx={{ mb: 2 }} action={<Button disabled={loading} onClick={() => setReload((n) => n + 1)} color="inherit">Refresh</Button>}>{loadError}</Alert>}
+    {!uploadOnly && processingEnabled === false && hasActiveExtraction && <Alert severity="info" sx={{ mb: 2 }}>Text processing is paused. You can still open and download your documents.</Alert>}
+    {!uploadOnly && pollError && <Alert severity="warning" sx={{ mb: 2 }} action={<Button onClick={() => setReload(value => value + 1)} color="inherit">Refresh</Button>}>{pollError}</Alert>}
     {error && <Alert onClose={() => setError('')} severity="error" sx={{ mb: 2 }} action={<Button disabled={loading} onClick={() => setReload((n) => n + 1)} color="inherit">Refresh</Button>}>{error}</Alert>}
     {loading ? <Box sx={{ textAlign: 'center', py: 3 }}><CircularProgress size={24} aria-label="Loading documents" /></Box> : !expandedUpload && !uploadOnly && !loadError && !items.length && !hasFolders ? <Box sx={{ textAlign: 'center', py: 5 }}><FolderIcon /><Typography sx={{ fontSize: 15, fontWeight: 600, color: '#657487', mt: 2 }}>{folderId ? 'This folder is empty' : 'This course folder is empty'}</Typography><Typography sx={{ fontSize: 12, color: '#8b96a4', mt: 1 }}>Upload a document or create a folder to organize your materials.</Typography></Box> : null}
     {!uploadOnly && !loading && items.length > 0 && <Paper variant="outlined" sx={{ borderRadius: '10px', overflow: 'hidden' }}><List disablePadding aria-label="Documents">
-      {items.map((material) => <ListItem key={material.id} disablePadding sx={{ borderBottom: '1px solid #eef0f3', '&:last-child': { border: 0 } }}>
+      {items.map((material) => <ListItem id={`material-${material.id}`} key={material.id} disablePadding sx={{ display: 'block', borderBottom: '1px solid #eef0f3', '&:last-child': { border: 0 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
         <ListItemButton disabled={material.state !== 'ready' || contentBusy} onClick={() => openContent(material)} aria-label={`Preview ${material.title}`} sx={{ p: 2, gap: 2, minWidth: 0 }}>
           <SvgIcon sx={{ color: '#8b9fb6', fontSize: 32, flexShrink: 0 }}><path d="M5 2h9l5 5v15H5V2zm9 1v5h5M8 12h8M8 16h8" fill="none" stroke="currentColor" strokeWidth="1.5" /></SvgIcon>
           <Box sx={{ minWidth: 0 }}><Typography sx={{ fontSize: 14, fontWeight: 600, overflowWrap: 'anywhere' }}>{material.title}</Typography><Typography sx={{ fontSize: 11, color: '#8792a0', mt: 0.5 }}>{material.mediaType === 'application/pdf' ? 'PDF' : 'TXT'} · {size(material.sizeBytes)} · {new Date(material.createdAt).toLocaleDateString()}</Typography>{material.state !== 'ready' && <Typography sx={{ fontSize: 11, mt: 0.5 }}>{material.state === 'uploading' ? 'Upload pending' : 'Cleanup pending'}</Typography>}</Box>
         </ListItemButton>
         <IconButton aria-label={`Actions for document ${material.title}`} aria-haspopup="menu" onClick={(event) => setMenu({ anchor: event.currentTarget, material })} sx={{ mr: 1 }}><SvgIcon><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></SvgIcon></IconButton>
+        </Box>
+        <ExtractionStatus material={material} retrying={retrying !== null} onRetry={retryExtraction} />
       </ListItem>)}
     </List></Paper>}
     {!uploadOnly && uploadingCount && <Box sx={{ mt: 1 }}><Typography sx={{ fontSize: 11, color: '#8792a0' }}>Pending operations recover automatically. Refresh to see their latest status.</Typography><Button size="small" disabled={loading} onClick={() => setReload((n) => n + 1)}>Refresh documents</Button></Box>}

@@ -98,6 +98,7 @@ export default function Home({ user, onLogout, onUserUpdate }) {
     </List>
     <Box sx={{ mt: 'auto', pt: 3 }}>
       <Divider sx={{ mb: 2, borderColor: '#e0e4e8' }} />
+      <Notifications key={user.email} wide={wide} basePath={basePath} onUnauthorized={signOut} onNavigate={() => setMobileOpen(false)} />
       <Tooltip title={wide ? '' : 'Account'} placement="right">
         <Button aria-label="Account menu" aria-haspopup="menu" aria-expanded={Boolean(accountAnchor)} aria-controls={accountAnchor ? 'account-menu' : undefined}
           onClick={(event) => setAccountAnchor(event.currentTarget)}
@@ -121,10 +122,6 @@ export default function Home({ user, onLogout, onUserUpdate }) {
           <IconButton aria-label="Open navigation" onClick={() => setMobileOpen(true)} sx={{ display: { md: 'none' }, color: '#526174' }}><Icon name="menu" /></IconButton>
           <Typography noWrap sx={{ fontSize: { xs: 11, sm: 13 }, fontWeight: 600 }}>My workspace<Box component="span" sx={{ color: '#a4adb8', mx: 1.5 }}>/</Box><Box component="span" sx={{ color: '#8893a1', fontWeight: 400 }}>{current.label}</Box></Typography>
         </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-          <Typography sx={{ fontSize: 11, color: '#8893a1', display: { xs: 'none', sm: 'block' } }}>Store Smart. Analyze Smarter.</Typography>
-          <Notifications />
-        </Box>
       </Box>
       <Box component="main" id="main-content" tabIndex={-1} sx={{ maxWidth: 1360, mx: 'auto', p: { xs: 2.5, sm: 4, lg: 5 }, outline: 'none' }}>
         {current.key === 'home' && missingDetails.length > 0 && <Paper component="section" aria-labelledby="profile-setup-title" sx={{ ...cardStyle, p: { xs: 2, sm: 2.5 }, mb: 3, display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2.5, flexWrap: 'wrap', borderColor: '#e7bd69', bgcolor: '#fff6e5' }}>
@@ -139,25 +136,14 @@ export default function Home({ user, onLogout, onUserUpdate }) {
           <Button component={RouterLink} to={`${basePath}/profile`} variant="outlined" endIcon={<Icon name="arrow" />} sx={{ ...actionStyle, color: '#795016', borderColor: '#d2a653', '&:hover': { borderColor: '#aa7627', bgcolor: '#ffedc8' }, borderRadius: '8px', px: 2, py: 1, whiteSpace: 'nowrap' }}>Complete profile</Button>
         </Paper>}
         {current.key !== 'profile' && <Typography sx={{ fontSize: 9, letterSpacing: 2, color: '#8b95a2', fontWeight: 700, mb: 1.2 }}>YOUR PERSONAL LEARNING SPACE</Typography>}
-        <Typography component="h1" sx={{ fontSize: { xs: 28, sm: 34 }, fontWeight: 700, letterSpacing: '-1px', mb: current.key === 'profile' ? 4 : 0 }}>{current.key === 'home' ? `Welcome home, ${firstName}.` : current.label}</Typography>
-        {current.key !== 'profile' && <Typography sx={{ fontSize: 13, color: '#8a94a1', mt: 1, mb: 4, lineHeight: 1.8 }}>{current.key === 'home' ? 'A clearer space for everything you’re learning.' : {
+        <Typography component="h1" sx={{ fontSize: { xs: 28, sm: 34 }, fontWeight: 700, letterSpacing: '-1px', mb: ['profile', 'home'].includes(current.key) ? 4 : 0 }}>{current.key === 'home' ? `Welcome home, ${firstName}.` : current.label}</Typography>
+        {!['profile', 'home'].includes(current.key) && <Typography sx={{ fontSize: 13, color: '#8a94a1', mt: 1, mb: 4, lineHeight: 1.8 }}>{{
           courses: 'A place for every subject and every new idea.',
           materials: 'Keep your notes, syllabi, and past exams together.',
           upcoming: 'See what’s ahead, one deadline at a time.',
         }[current.key]}</Typography>}
 
         {current.key === 'courses' ? <Courses key={user.email} courseId={courseDetail?.[1]} folderId={courseDetail?.[2]} basePath={basePath} onUnauthorized={signOut} /> : current.key === 'profile' ? <Profile user={user} onUserUpdate={onUserUpdate} onLogout={onLogout} /> : current.key === 'home' ? <>
-          <Paper sx={{ ...cardStyle, p: { xs: 3, sm: 4 }, mb: 4, bgcolor: '#e9edf2', backgroundImage: 'linear-gradient(110deg, #e6ebf1, #f0f2f5)', display: 'flex', justifyContent: 'space-between', gap: 3, alignItems: 'center' }}>
-            <Box sx={{ maxWidth: 520 }}>
-              <Typography sx={{ color: '#6a7d93', fontSize: 9, letterSpacing: 2, fontWeight: 700, mb: 1.5 }}>A NEW CHAPTER STARTS HERE</Typography>
-              <Typography component="h2" sx={{ fontSize: { xs: 23, sm: 27 }, fontWeight: 600, letterSpacing: '-.8px' }}>Big ideas need a little space.</Typography>
-              <Typography sx={{ color: '#7a8797', fontSize: 12, lineHeight: 1.9, mt: 1.5, maxWidth: 390 }}>From the first lecture to the final exam, make room for your notes, your progress, and your potential.</Typography>
-              <Button component={RouterLink} to={`${basePath}/courses`} endIcon={<Icon name="arrow" />} sx={{ ...actionStyle, mt: 2, px: 0 }}>Explore your courses</Button>
-            </Box>
-            <Box aria-hidden="true" sx={{ display: { xs: 'none', sm: 'grid' }, gridTemplateColumns: 'repeat(3, 1fr)', alignItems: 'end', gap: 1, height: 120, pr: 2, flexShrink: 0 }}>
-              {[['N', 86, '#b8c7d9'], ['S', 112, '#c8cdd5'], ['E', 96, '#b6c4be']].map(([letter, height, color]) => <Box key={letter} sx={{ width: 37, height, bgcolor: color, borderRadius: '5px', display: 'grid', placeItems: 'center', transform: letter === 'E' ? 'rotate(8deg)' : 'none', boxShadow: 'inset -5px 0 #00000008' }}><Typography sx={{ color: '#607083', fontSize: 11, fontWeight: 600 }}>{letter}</Typography></Box>)}
-            </Box>
-          </Paper>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.65fr 1fr' }, gap: 3 }}>
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}><Typography component="h2" sx={{ fontSize: 15, fontWeight: 600 }}>Your courses</Typography><Button component={RouterLink} to={`${basePath}/courses`} sx={actionStyle}>View courses <Icon name="arrow" sx={{ ml: 1, fontSize: 15 }} /></Button></Box>
@@ -173,7 +159,6 @@ export default function Home({ user, onLogout, onUserUpdate }) {
         </> : <Paper sx={cardStyle}><EmptyState icon={current.key} title={{ courses: 'Your courses will live here', materials: 'Your materials will live here', upcoming: 'Your schedule has room to grow' }[current.key]}>{
           { courses: 'Organize each subject with its own space for notes, syllabi, and exams.', materials: 'A central home for the documents you learn from, organized by course.', upcoming: 'Keep confirmed exam dates and assignment deadlines together.' }[current.key]
         }</EmptyState><Divider sx={{ borderColor: '#eef0f3' }} /><Box sx={{ textAlign: 'center', p: 1.5 }}><Button component={RouterLink} to={basePath} sx={actionStyle}>Back to home</Button></Box></Paper>}
-        {current.key !== 'profile' && <Typography sx={{ mt: 4, color: '#a1a9b3', fontSize: 10 }}>IQLocker · A little organization. A lot of possibility.</Typography>}
       </Box>
     </Box>
     <Menu id="account-menu" anchorEl={accountAnchor} open={Boolean(accountAnchor)} onClose={() => setAccountAnchor(null)} anchorOrigin={{ vertical: 'top', horizontal: 'right' }} transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
