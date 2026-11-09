@@ -1,3 +1,6 @@
+// Avatar API behavior is covered by the dedicated integration tests.
+jest.mock('./hooks/useAvatar', () => () => ({ url: '', loading: false, busy: false, hasAvatar: false, error: '',
+  refresh: jest.fn(), upload: jest.fn(), remove: jest.fn(), imageError: jest.fn() }));
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from './App';
 import { api } from './utils/api';

@@ -1,3 +1,6 @@
+// Avatar API behavior is covered by the dedicated integration tests.
+jest.mock('../../hooks/useAvatar', () => () => ({ url: '', loading: false, busy: false, hasAvatar: false, error: '',
+  refresh: jest.fn(), upload: jest.fn(), remove: jest.fn(), imageError: jest.fn() }));
 // Notifications have their own polling/API tests; keep these course requests isolated.
 jest.mock('../Navbar/Notifications', () => () => null);
 import { act, fireEvent, render, screen, within } from '@testing-library/react';

@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import Courses from '../Courses/Courses';
 import HomeCourses from '../Courses/HomeCourses';
 import Profile from '../Profile/Profile';
+import useAvatar from '../../hooks/useAvatar';
 import Notifications from '../Navbar/Notifications';
 import { Link as RouterLink, Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -72,6 +73,8 @@ export default function Home({ user, onLogout, onUserUpdate }) {
     navigate('/', { replace: true });
   }, [onLogout, navigate]);
 
+  const avatarState = useAvatar(user.email, signOut);
+
   const navigation = <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box', overflowY: 'auto', px: 1.5, py: 2.5 }}>
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: wide ? 'space-between' : 'center', mb: 3, minHeight: 38 }}>
       {wide && <Typography sx={{ ml: 1, fontWeight: 800, letterSpacing: '-.7px', fontSize: 20, color: '#34475c' }}>IQLocker</Typography>}
@@ -103,7 +106,7 @@ export default function Home({ user, onLogout, onUserUpdate }) {
         <Button aria-label="Account menu" aria-haspopup="menu" aria-expanded={Boolean(accountAnchor)} aria-controls={accountAnchor ? 'account-menu' : undefined}
           onClick={(event) => setAccountAnchor(event.currentTarget)}
           sx={{ minWidth: 0, width: '100%', display: 'flex', gap: 1.25, justifyContent: wide ? 'flex-start' : 'center', textTransform: 'none', color: '#34475c', borderRadius: '9px', px: wide ? 1 : 0, py: 1 }}>
-          <Avatar sx={{ width: 34, height: 34, bgcolor: '#dbe1e8', color: '#485b70', fontSize: 12, fontWeight: 700 }}>{avatar}</Avatar>
+          <Avatar src={avatarState.url || undefined} alt={`${user.fullname} avatar`} slotProps={{ img: { onError: avatarState.imageError } }} sx={{ width: 34, height: 34, bgcolor: '#dbe1e8', color: '#485b70', fontSize: 12, fontWeight: 700 }}>{avatar}</Avatar>
           {wide && <Box sx={{ textAlign: 'left', overflow: 'hidden' }}><Typography noWrap sx={{ fontSize: 12, fontWeight: 600 }}>{user.fullname}</Typography><Typography sx={{ fontSize: 10, color: '#8b95a2' }}>Your account</Typography></Box>}
         </Button>
       </Tooltip>
@@ -143,7 +146,7 @@ export default function Home({ user, onLogout, onUserUpdate }) {
           upcoming: 'See what’s ahead, one deadline at a time.',
         }[current.key]}</Typography>}
 
-        {current.key === 'courses' ? <Courses key={user.email} courseId={courseDetail?.[1]} folderId={courseDetail?.[2]} basePath={basePath} onUnauthorized={signOut} /> : current.key === 'profile' ? <Profile user={user} onUserUpdate={onUserUpdate} onLogout={onLogout} /> : current.key === 'home' ? <>
+        {current.key === 'courses' ? <Courses key={user.email} courseId={courseDetail?.[1]} folderId={courseDetail?.[2]} basePath={basePath} onUnauthorized={signOut} /> : current.key === 'profile' ? <Profile avatarState={avatarState} user={user} onUserUpdate={onUserUpdate} onLogout={onLogout} /> : current.key === 'home' ? <>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.65fr 1fr' }, gap: 3 }}>
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}><Typography component="h2" sx={{ fontSize: 15, fontWeight: 600 }}>Your courses</Typography><Button component={RouterLink} to={`${basePath}/courses`} sx={actionStyle}>View courses <Icon name="arrow" sx={{ ml: 1, fontSize: 15 }} /></Button></Box>

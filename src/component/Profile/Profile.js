@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Avatar, Box, Button, CircularProgress, IconButton, Paper, Popover, SvgIcon, TextField, Typography } from '@mui/material';
+import { Alert, Avatar, Box, Button, ButtonBase, CircularProgress, IconButton, Paper, Popover, SvgIcon, TextField, Tooltip, Typography } from '@mui/material';
 import { api } from '../../utils/api';
 import { splitFullname } from '../../utils/account';
 
-export default function Profile({ user, onUserUpdate, onLogout }) {
+export default function Profile({ user, onUserUpdate, onLogout, avatarState }) {
   const [firstName, setFirstName] = useState(() => splitFullname(user.fullname).firstName);
   const [lastName, setLastName] = useState(() => splitFullname(user.fullname).lastName);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState('');
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [rotation, setRotation] = useState(0);
+  const [avatarView, setAvatarView] = useState('upload');
+  const [avatarNotice, setAvatarNotice] = useState('');
+  const avatarBusy = avatarState.busy;
   const [avatarError, setAvatarError] = useState('');
   const [avatarAnchor, setAvatarAnchor] = useState(null);
   const [dragging, setDragging] = useState(false);
@@ -45,17 +50,18 @@ export default function Profile({ user, onUserUpdate, onLogout }) {
   };
 
   const acceptAvatar = (files) => {
-    if (saving || !files?.length) return;
+    if (saving || avatarBusy || !files?.length) return;
     setAvatarError('');
     if (files.length !== 1) {
       setAvatarError('Please choose one photo at a time.');
       return;
     }
     const file = files[0];
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5_000_000 || file.size === 0) {
       setAvatarError('Choose a JPG, PNG, or WebP image no larger than 5 MB.');
       return;
     }
+    setRotation(0); setAvatarFile(file); setAvatarNotice('');
     setAvatarPreview(URL.createObjectURL(file));
     setSuccess(false);
     closeAvatarPicker();
@@ -77,7 +83,7 @@ export default function Profile({ user, onUserUpdate, onLogout }) {
   const cancel = () => {
     setFirstName(splitFullname(user.fullname).firstName);
     setLastName(splitFullname(user.fullname).lastName);
-    setAvatarPreview('');
+    setAvatarPreview(''); setAvatarFile(null); setRotation(0); setAvatarNotice('');
     setAvatarError('');
     setSchool(user.school ?? '');
     setMajor(user.major ?? '');
@@ -129,16 +135,48 @@ export default function Profile({ user, onUserUpdate, onLogout }) {
     }
   };
 
+  const saveAvatar = async () => {
+    if (!avatarFile || avatarBusy) return;
+    const saved = await avatarState.upload(avatarFile, rotation);
+    if (saved) { setAvatarPreview(''); setAvatarFile(null); setRotation(0); setAvatarError(''); setAvatarNotice('Photo saved.'); }
+  };
+  const removeAvatar = async () => {
+    if (avatarBusy) return;
+    if (!avatarState.hasAvatar || await avatarState.remove()) {
+      setAvatarPreview(''); setAvatarFile(null); setRotation(0); setAvatarError(''); setAvatarNotice('Photo removed.'); closeAvatarPicker();
+    }
+  };
+
+  const openAvatar = (event) => {
+    setAvatarAnchor(event.currentTarget); setAvatarError('');
+    setAvatarView(avatarState.hasAvatar || avatarPreview ? 'actions' : 'upload');
+  };
+  const rotateAvatar = () => {
+    if (avatarBusy || saving) return;
+    if (!avatarFile) {
+      const file = avatarState.savedFile();
+      if (!file) { setAvatarError('Reload your saved photo before rotating it.'); closeAvatarPicker(); return; }
+      setAvatarFile(file); setAvatarPreview(URL.createObjectURL(file));
+    }
+    setRotation(value => (value + 90) % 360); setAvatarNotice('');
+    closeAvatarPicker();
+  };
+
   const cardStyle = { border: '1px solid #e2e5e9', borderRadius: '14px', bgcolor: '#fff', p: { xs: 2.5, sm: 3.5 } };
   const previewChanges = Boolean(avatarPreview || avatarError);
+  const avatarFeedback = avatarState.error && <Alert severity="warning" sx={{ my: 2 }} action={<Button disabled={avatarBusy || avatarState.loading} onClick={avatarState.refresh} color="inherit">Reload photo</Button>}>{avatarState.error}</Alert>;
 
   return <Box sx={{ width: '100%', maxWidth: 1120 }}>
     <Paper elevation={0} sx={{ ...cardStyle, display: 'flex', alignItems: 'center', flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 2.5, sm: 4 }, mb: 3, py: { xs: 3.5, sm: 4.5 }, backgroundImage: 'linear-gradient(110deg, #f5f7fa, #fff)' }}>
       <Box sx={{ position: 'relative', flexShrink: 0 }}>
-        <Avatar src={avatarPreview || undefined} alt={user.fullname} sx={{ width: { xs: 112, sm: 144 }, height: { xs: 112, sm: 144 }, bgcolor: '#dfe5ed', color: '#485b70', fontSize: { xs: 38, sm: 46 }, fontWeight: 600, border: '5px solid #fff', boxShadow: '0 3px 16px #34475c10' }}
-          slotProps={{ img: { onError: () => { setAvatarPreview(''); setAvatarError('This image couldn’t be opened. Please choose another file.'); } } }}>{avatar}</Avatar>
+        <ButtonBase type="button" aria-label="Avatar options" aria-haspopup="dialog" aria-expanded={Boolean(avatarAnchor)} aria-controls={avatarAnchor ? 'avatar-picker' : undefined}
+          disabled={saving || avatarBusy || !(avatarState.hasAvatar || avatarPreview)} onClick={openAvatar}
+          sx={{ borderRadius: '50%', '&.Mui-focusVisible': { outline: '2px solid #496788', outlineOffset: 3 } }}>
+        <Avatar src={avatarPreview || avatarState.url || undefined} alt={user.fullname} sx={{ width: { xs: 112, sm: 144 }, height: { xs: 112, sm: 144 }, bgcolor: '#dfe5ed', color: '#485b70', fontSize: { xs: 38, sm: 46 }, fontWeight: 600, border: '5px solid #fff', boxShadow: '0 3px 16px #34475c10', '& img': { transform: `rotate(${rotation}deg)` } }}
+          slotProps={{ img: { onError: () => { if (avatarPreview) { setAvatarPreview(''); setAvatarFile(null); setRotation(0); setAvatarError('This image couldn’t be opened. Please choose another file.'); } else avatarState.imageError(); } } }}>{avatar}</Avatar>
+        </ButtonBase>
         <IconButton type="button" aria-label="Change avatar" aria-haspopup="dialog" aria-expanded={Boolean(avatarAnchor)} aria-controls={avatarAnchor ? 'avatar-picker' : undefined}
-          disabled={saving} onClick={(event) => { setAvatarAnchor(event.currentTarget); setAvatarError(''); }}
+          disabled={saving || avatarBusy} onClick={openAvatar}
           sx={{ position: 'absolute', right: 2, bottom: 2, width: 38, height: 38, bgcolor: '#34475c', color: '#fff', border: '3px solid #fff', boxShadow: '0 2px 8px #34475c22', '&:hover': { bgcolor: '#26394e' } }}>
           <SvgIcon sx={{ fontSize: 19 }} viewBox="0 0 24 24"><path d="M4 6h4l2-3h4l2 3h4v15H4z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /><circle cx="12" cy="13" r="4" fill="none" stroke="currentColor" strokeWidth="1.7" /></SvgIcon>
         </IconButton>
@@ -146,14 +184,27 @@ export default function Profile({ user, onUserUpdate, onLogout }) {
       <Box sx={{ minWidth: 0, flex: 1, textAlign: { xs: 'center', sm: 'left' } }}>
         <Typography sx={{ fontSize: { xs: 23, sm: 27 }, fontWeight: 600, letterSpacing: '-.5px', overflowWrap: 'anywhere' }}>{user.fullname}</Typography>
         <Typography sx={{ fontSize: 13, color: '#8792a0', mt: 1, overflowWrap: 'anywhere' }}>{user.email}</Typography>
-        {avatarPreview && <Typography sx={{ fontSize: 11, color: '#919ba8', mt: 1.5 }}>Avatar preview · not saved</Typography>}
+        {avatarState.loading && <Typography role="status" sx={{ fontSize: 11, color: '#8792a0', mt: 1.5 }}>Loading photo…</Typography>}
+        {avatarPreview && <Box sx={{ mt: 1.5 }}>
+          <Typography sx={{ fontSize: 11, color: '#919ba8', mb: 1 }}>Photo selected · not saved</Typography>
+          <Button type="button" disabled={avatarBusy || saving} onClick={saveAvatar} size="small" variant="contained" disableElevation sx={{ textTransform: 'none', bgcolor: '#34475c' }}>{avatarBusy ? 'Saving photo…' : 'Save photo'}</Button>
+          <Button type="button" disabled={avatarBusy} size="small" onClick={() => { setAvatarPreview(''); setAvatarFile(null); setRotation(0); setAvatarError(''); }} sx={{ textTransform: 'none', ml: 1 }}>Discard photo</Button>
+        </Box>}
+        {avatarBusy && <CircularProgress size={18} aria-label="Updating avatar" sx={{ mt: 1.5, color: '#34475c' }} />}
+        {avatarNotice && !avatarState.error && <Typography role="status" sx={{ fontSize: 12, color: '#42705a', mt: 1.5 }}>{avatarNotice}</Typography>}
       </Box>
     </Paper>
     <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Avatar image" hidden onChange={selectAvatar} />
     <Popover open={Boolean(avatarAnchor)} anchorEl={avatarAnchor} onClose={closeAvatarPicker}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-      marginThreshold={16} slotProps={{ paper: { sx: { mt: 1, width: 320, maxWidth: 'calc(100vw - 32px)', borderRadius: '14px', border: '1px solid #e2e5e9', boxShadow: '0 12px 40px #26394e22' } } }}>
-      <Box role="dialog" id="avatar-picker" aria-labelledby="avatar-picker-title" sx={{ p: 2.5 }}>
+      marginThreshold={16} slotProps={{ paper: { sx: { mt: 1, width: avatarView === 'actions' ? 200 : 320, maxWidth: 'calc(100vw - 32px)', borderRadius: '14px', border: '1px solid #e2e5e9', boxShadow: '0 12px 40px #26394e22' } } }}>
+      {avatarView === 'actions' ? <Box role="dialog" id="avatar-picker" aria-label="Avatar actions" sx={{ p: 1.25 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-around' }}>
+        <Tooltip title="Rotate photo"><span><IconButton aria-label="Rotate photo" disabled={avatarBusy || saving || (!avatarFile && !avatarState.url)} onClick={rotateAvatar} sx={{ color: '#40566e' }}><SvgIcon><path d="M20 7V3l-3 3a8 8 0 1 0 3 9M20 7h-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></SvgIcon></IconButton></span></Tooltip>
+        <Tooltip title="Change photo"><IconButton aria-label="Change photo" disabled={avatarBusy || saving} onClick={() => setAvatarView('upload')} sx={{ color: '#40566e' }}><SvgIcon><path d="M4 6h4l2-3h4l2 3h4v15H4z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /><circle cx="12" cy="13" r="4" fill="none" stroke="currentColor" strokeWidth="1.7" /></SvgIcon></IconButton></Tooltip>
+        <Tooltip title="Delete photo"><IconButton aria-label="Delete photo" disabled={avatarBusy || saving} onClick={removeAvatar} sx={{ color: '#a94a42' }}><SvgIcon><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></SvgIcon></IconButton></Tooltip>
+        </Box>{avatarFeedback}
+      </Box> : <Box role="dialog" id="avatar-picker" aria-labelledby="avatar-picker-title" sx={{ p: 2.5 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography component="h2" id="avatar-picker-title" sx={{ fontSize: 15, fontWeight: 600, color: '#34475c' }}>Change avatar</Typography>
           <IconButton aria-label="Close avatar picker" onClick={closeAvatarPicker} size="small"><SvgIcon sx={{ fontSize: 18 }}><path d="m6 6 12 12M6 18 18 6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></SvgIcon></IconButton>
@@ -164,13 +215,15 @@ export default function Profile({ user, onUserUpdate, onLogout }) {
           sx={{ textAlign: 'center', border: '2px dashed', borderColor: dragging ? '#496788' : '#d2dbe5', bgcolor: dragging ? '#e7edf5' : '#f7f9fb', borderRadius: '10px', px: 2, py: 3 }}>
           <SvgIcon sx={{ color: '#7c8da2', fontSize: 30, mb: 1 }}><path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></SvgIcon>
           <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#53647a' }}>{dragging ? 'Drop your photo here' : 'Drag and drop your photo'}</Typography>
-          <Button type="button" onClick={() => avatarInput.current?.click()} sx={{ textTransform: 'none', fontSize: 12, color: '#40566e', mt: 0.5 }}>or browse files</Button>
+          <Button type="button" disabled={avatarBusy || saving} onClick={() => avatarInput.current?.click()} sx={{ textTransform: 'none', fontSize: 12, color: '#40566e', mt: 0.5 }}>or browse files</Button>
+          <Typography sx={{ fontSize: 10, color: '#8792a0', mt: 1.5, lineHeight: 1.8 }}>JPG, PNG or WebP · Up to 5 MB</Typography>
         </Box>
-        <Typography sx={{ fontSize: 10, color: '#8792a0', mt: 1.5, lineHeight: 1.8 }}>JPG, PNG or WebP · Up to 5 MB<br />Local preview only — not saved</Typography>
+        {avatarFeedback}
         {avatarError && <Alert severity="error" sx={{ mt: 2 }}>{avatarError}</Alert>}
-        {avatarPreview && <Button type="button" onClick={() => { setAvatarPreview(''); closeAvatarPicker(); }} sx={{ textTransform: 'none', color: '#697789', fontSize: 12, mt: 1.5 }}>Remove preview</Button>}
-      </Box>
+        {avatarPreview && <Button type="button" disabled={avatarBusy} onClick={() => { setAvatarPreview(''); setAvatarFile(null); setRotation(0); closeAvatarPicker(); }} sx={{ textTransform: 'none', color: '#697789', fontSize: 12, mt: 1.5 }}>Remove preview</Button>}
+      </Box>}
     </Popover>
+    {!avatarAnchor && avatarFeedback}
     {avatarError && !avatarAnchor && <Alert severity="error" sx={{ mb: 3 }}>{avatarError}</Alert>}
     <Box component="form" onSubmit={save} aria-busy={saving} sx={{ display: 'grid', gap: 3,
       '& .MuiOutlinedInput-root': { fontSize: 14, borderRadius: '8px', '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#496788' } },
@@ -196,9 +249,9 @@ export default function Profile({ user, onUserUpdate, onLogout }) {
         </Box>
       </Paper>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', pb: 1 }}>
-        <Typography sx={{ fontSize: 11, color: '#8792a0', maxWidth: 440, lineHeight: 1.8 }}>Your details are saved to your account. Avatar changes are still local previews.</Typography>
+        <Typography sx={{ fontSize: 11, color: '#8792a0', maxWidth: 440, lineHeight: 1.8 }}>Save your photo separately from your personal information.</Typography>
         <Box sx={{ display: 'flex', gap: 1.5, ml: 'auto' }}>
-          <Button type="button" onClick={cancel} disabled={saving || (!changed && !error && !success && !previewChanges)} sx={{ textTransform: 'none', color: '#697789', px: 2 }}>Cancel</Button>
+          <Button type="button" onClick={cancel} disabled={saving || avatarBusy || (!changed && !error && !success && !previewChanges)} sx={{ textTransform: 'none', color: '#697789', px: 2 }}>Cancel</Button>
           <Button type="submit" disabled={saving || !changed} variant="contained" disableElevation sx={{ bgcolor: '#34475c', '&:hover': { bgcolor: '#26394e' }, textTransform: 'none', borderRadius: '8px', px: 2.5, minWidth: 145 }}>
             {saving ? 'Saving…' : 'Save changes'}{saving && <CircularProgress size={15} color="inherit" aria-label="Saving profile" sx={{ ml: 1.5 }} />}
           </Button>
