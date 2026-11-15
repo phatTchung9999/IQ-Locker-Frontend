@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import SyllabusReview from './SyllabusReview';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, LinearProgress, List, ListItem, ListItemButton, Menu, MenuItem, Paper, SvgIcon, Typography } from '@mui/material';
 import { api } from '../../utils/api';
@@ -15,7 +17,7 @@ function checkList(data) {
 }
 const fallbackLimits = { maxFileBytes: 20_000_000, limitBytes: 500_000_000, usedBytes: 0 };
 
-export default function CourseMaterials({ courseId, folderId, hasFolders, onUnauthorized, hideUploadArea = false, uploadOnly = false, incomingFiles, onUploadingChange }) {
+export default function CourseMaterials({ courseId, basePath, folderId, hasFolders, onUnauthorized, hideUploadArea = false, uploadOnly = false, incomingFiles, onUploadingChange }) {
   const [items, setItems] = useState([]);
   const [processingEnabled, setProcessingEnabled] = useState(null);
   const [pollError, setPollError] = useState('');
@@ -29,8 +31,11 @@ export default function CourseMaterials({ courseId, folderId, hasFolders, onUnau
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useState(null);
+  const [retryAnalysisError, setRetryAnalysisError] = useState(false);
   const [menu, setMenu] = useState(null);
   const [dialog, setDialog] = useState(null);
+  const [analysisMaterial, setAnalysisMaterial] = useState(null);
   const [preview, setPreview] = useState(null);
   const [contentBusy, setContentBusy] = useState(false);
   const input = useRef(null);
@@ -40,6 +45,30 @@ export default function CourseMaterials({ courseId, folderId, hasFolders, onUnau
   const unauthorized = useRef(onUnauthorized); unauthorized.current = onUnauthorized;
   const endpoint = `/api/v1/courses/${encodeURIComponent(courseId)}/materials`;
   const authorize = (err) => { if (err.response?.status === 401) unauthorized.current(); };
+  const syllabusId = menu?.material.materialType === 'syllabus' && menu.material.processingStatus === 'ready' ? menu.material.id : null;
+  const syllabusEndpoint = syllabusId ? endpoint + '/' + encodeURIComponent(syllabusId) + '/analysis' : null;
+  useEffect(() => {
+    setAnalysisStatus(null);
+    setRetryAnalysisError(false);
+    if (!syllabusEndpoint) return;
+    const controller = new AbortController();
+    let timer;
+    const load = async () => {
+      try {
+        const { data } = await api.get(syllabusEndpoint, courseOptions(controller.signal));
+        if (controller.signal.aborted) return;
+        setAnalysisStatus(data);
+        if (['queued', 'processing'].includes(data.state)) timer = setTimeout(load, 5000);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        if (err.response?.status === 401) unauthorized.current?.();
+        else setAnalysisStatus({ state: err.response?.status === 404 ? 'not_started' : 'unavailable' });
+      }
+    };
+    void load();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [syllabusEndpoint]);
+
   useEffect(() => {
     alive.current = true;
     return () => { alive.current = false; upload.current?.abort(); mutation.current?.abort(); content.current?.abort(); };
@@ -232,10 +261,26 @@ export default function CourseMaterials({ courseId, folderId, hasFolders, onUnau
     </List></Paper>}
     {!uploadOnly && uploadingCount && <Box sx={{ mt: 1 }}><Typography sx={{ fontSize: 11, color: '#8792a0' }}>Pending operations recover automatically. Refresh to see their latest status.</Typography><Button size="small" disabled={loading} onClick={() => setReload((n) => n + 1)}>Refresh documents</Button></Box>}
     <Menu anchorEl={menu?.anchor} open={Boolean(menu)} onClose={() => setMenu(null)}>
+      {menu?.material.materialType === 'syllabus' && basePath
+        ? analysisStatus?.state === 'ready'
+          ? <MenuItem component={Link} to={`${basePath}/upcoming?materialId=${encodeURIComponent(menu.material.id)}`} onClick={() => setMenu(null)}>Review on calendar</MenuItem>
+          : analysisStatus?.canRetry
+            ? <MenuItem onClick={async () => {
+                setRetryAnalysisError(false);
+                try { await api.post(syllabusEndpoint + '/retry', {}, courseOptions()); setMenu(null); }
+                catch (err) { authorize(err); setRetryAnalysisError(true); }
+              }}>{retryAnalysisError ? 'Retry failed — try again' : 'Retry analysis'}</MenuItem>
+            : <MenuItem disabled>{!syllabusEndpoint ? 'Waiting for extracted text' :
+                analysisStatus?.state === 'failed' ? 'Analysis failed' :
+                analysisStatus?.state === 'not_started' ? 'Automatic analysis not queued' :
+                analysisStatus?.state === 'unavailable' ? 'Analysis status unavailable' : 'Analyzing syllabus…'}</MenuItem>
+        : <MenuItem disabled={menu?.material.state !== 'ready' || menu?.material.processingStatus !== 'ready'}
+          onClick={() => { setAnalysisMaterial(menu.material); setMenu(null); }}>Analyze syllabus</MenuItem>}
       <MenuItem disabled={menu?.material.state !== 'ready'} onClick={() => { void openContent(menu.material, true); setMenu(null); }}>Download</MenuItem>
       <MenuItem disabled={menu?.material.state !== 'ready'} onClick={() => { setDialog({ material: menu.material }); setMenu(null); }}>Rename title</MenuItem>
       <MenuItem disabled={menu?.material.state === 'uploading'} onClick={() => { setDialog({ material: menu.material, deleting: true }); setMenu(null); }} sx={{ color: '#a94a42' }}>{menu?.material.state === 'ready' ? 'Delete document' : 'Retry cleanup'}</MenuItem>
     </Menu>
+    {analysisMaterial && <SyllabusReview courseId={courseId} material={analysisMaterial} onClose={() => setAnalysisMaterial(null)} onUnauthorized={onUnauthorized} />}
     {dialog && <MaterialDialog {...dialog} onClose={() => setDialog(null)} onSubmit={change} />}
     {preview && <Dialog open fullWidth maxWidth="md" onClose={closePreview} aria-labelledby="material-preview-title"><DialogTitle id="material-preview-title" sx={{ overflowWrap: 'anywhere' }}>{preview.material.title}</DialogTitle><DialogContent dividers>
       {preview.bytes === null ? <CircularProgress aria-label="Opening document" /> : preview.material.mediaType === 'text/plain' ? <Box component="pre" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontFamily: 'inherit', fontSize: 14 }}>{preview.text}</Box> : <Suspense fallback={<CircularProgress aria-label="Loading PDF viewer" />}><PdfPreview bytes={preview.bytes} /></Suspense>}

@@ -4,7 +4,7 @@ import { Alert, Badge, Box, Button, CircularProgress, IconButton, List, ListItem
 import { api } from '../../utils/api';
 import { courseOptions } from '../Courses/courseData';
 const endpoint = '/api/v1/notifications';
-const safePath = path => typeof path === 'string' && /^(\/profile|\/courses(?:\/[a-f\d]{24}(?:\/folders\/[a-f\d]{24})?(?:#material-[a-f\d]{24})?)?)$/i.test(path);
+const safePath = path => typeof path === 'string' && /^(\/profile|\/upcoming\?materialId=[a-f\d]{24}|\/courses(?:\/[a-f\d]{24}(?:\/folders\/[a-f\d]{24})?(?:#material-[a-f\d]{24})?)?)$/i.test(path);
 function check(data) {
   if (!Array.isArray(data?.notifications) || !Number.isSafeInteger(data.unreadCount) || data.unreadCount < 0 ||
       !(data.nextCursor === null || /^[a-f\d]{24}$/i.test(data.nextCursor)) ||

@@ -1,3 +1,4 @@
+import SyllabusCalendar from './SyllabusCalendar';
 import { useCallback, useState } from 'react';
 import Courses from '../Courses/Courses';
 import HomeCourses from '../Courses/HomeCourses';
@@ -159,7 +160,7 @@ export default function Home({ user, onLogout, onUserUpdate }) {
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 4, mb: 1.5 }}><Typography component="h2" sx={{ fontSize: 15, fontWeight: 600 }}>Recent materials</Typography><Button component={RouterLink} to={`${basePath}/materials`} sx={actionStyle}>View all <Icon name="arrow" sx={{ ml: 1, fontSize: 15 }} /></Button></Box>
           <Paper sx={cardStyle}><EmptyState icon="materials" title="Your next idea starts here" compact>Notes, syllabi, and past exams will appear here as you build your locker.</EmptyState></Paper>
-        </> : <Paper sx={cardStyle}><EmptyState icon={current.key} title={{ courses: 'Your courses will live here', materials: 'Your materials will live here', upcoming: 'Your schedule has room to grow' }[current.key]}>{
+        </> : current.key === 'upcoming' ? <SyllabusCalendar basePath={basePath} onUnauthorized={signOut} /> : <Paper sx={cardStyle}><EmptyState icon={current.key} title={{ courses: 'Your courses will live here', materials: 'Your materials will live here', upcoming: 'Your schedule has room to grow' }[current.key]}>{
           { courses: 'Organize each subject with its own space for notes, syllabi, and exams.', materials: 'A central home for the documents you learn from, organized by course.', upcoming: 'Keep confirmed exam dates and assignment deadlines together.' }[current.key]
         }</EmptyState><Divider sx={{ borderColor: '#eef0f3' }} /><Box sx={{ textAlign: 'center', p: 1.5 }}><Button component={RouterLink} to={basePath} sx={actionStyle}>Back to home</Button></Box></Paper>}
       </Box>

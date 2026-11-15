@@ -106,7 +106,7 @@ export default function CourseFolders({ course, folderId, basePath, onUnauthoriz
           {!folder.isStarter && action(folder, 'edit', 'Edit folder')}{!folder.isStarter && action(folder, 'delete', 'Delete folder')}
         </FolderDropTarget>)}
       </List></Paper>}
-      <CourseMaterials key={`${course.id}:${folderId || 'root'}`} courseId={course.id} folderId={folderId} hideUploadArea={!folderId || data.folders.length > 0} hasFolders={data.folders.length > 0} onUnauthorized={onUnauthorized} />
+      <CourseMaterials key={`${course.id}:${folderId || 'root'}`} courseId={course.id} basePath={basePath} folderId={folderId} hideUploadArea={!folderId || data.folders.length > 0} hasFolders={data.folders.length > 0} onUnauthorized={onUnauthorized} />
     </>}
     {dialog && <FolderDialog folder={dialog.folder} deleting={dialog.kind === 'delete'} onClose={() => setDialog(null)} onSubmit={(fields) => change(dialog.kind, fields)} />}
     </Box>
